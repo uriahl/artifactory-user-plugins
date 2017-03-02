@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
+
 import groovy.json.JsonSlurper
-import org.apache.http.HttpEntity
 import org.apache.http.HttpResponse
 import org.apache.http.client.HttpClient
-import org.apache.http.client.HttpResponseException
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpRequestBase
@@ -111,23 +110,26 @@ def genericRoutedCall(String serverId, String apiEndpoint, HttpRequestBase base)
     url.append(apiEndpoint);
     log.debug("Target URL: " + url.toString())
 
-    HttpClient client = createHttpClient(url.toString())
-    if (client == null) {
-        return
-    }
-
-    base.setURI(URI.create(url.toString()));
-    def headerValue = org.artifactory.request.RequestThreadLocal.context.get().requestThreadLocal.request.getHeader("authorization")
-    if (headerValue == null) {
-        return;
-    }
-
-    base.addHeader("authorization", headerValue);
 
     try {
+        HttpClient client = createHttpClient(url.toString())
+        if (client == null) {
+            return
+        }
+
+        base.setURI(URI.create(url.toString()));
+        def headerValue = org.artifactory.request.RequestThreadLocal.context.get().requestThreadLocal.request.getHeader(
+                "authorization")
+        if (headerValue == null) {
+            return;
+        }
+
+        base.addHeader("authorization", headerValue);
+
+
         HttpResponse response = client.execute(base);
         String responseBody = EntityUtils.toString(response.getEntity())
-        if(response.getStatusLine().statusCode == 400) {
+        if (response.getStatusLine().statusCode == 400) {
             log.error("Target Server error response: $responseBody")
             message = new JsonSlurper().parseText(responseBody).message
             return [message, response.getStatusLine().getStatusCode()]
@@ -137,11 +139,14 @@ def genericRoutedCall(String serverId, String apiEndpoint, HttpRequestBase base)
     } catch (IOException ioe) {
         log.error("Target Server error respons: $ioe.message")
         return [ioe.getMessage(), 500]
+    } finally {
+        client.close()
     }
 }
 
 private HttpClient createHttpClient(String host) {
-    org.artifactory.api.security.UserGroupService userGroupService = ContextHelper.get().beanForType(org.artifactory.api.security.UserGroupService.class)
+    org.artifactory.api.security.UserGroupService userGroupService = ContextHelper.get().beanForType(
+            org.artifactory.api.security.UserGroupService.class)
 
     def user = userGroupService.currentUser()
     if (user != null) {
